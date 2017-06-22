@@ -5,7 +5,7 @@ class Start {
 			System.out.println("Aufruf: Start n seed");
 			System.exit(1);
 		}
-		int n = 200;//Integer.parseInt(args[0]);
+		int n = 120;//Integer.parseInt(args[0]);
 		long seed = 123;//Long.parseLong(args[1]);
 
 		Board board = new Board(n, seed);
@@ -108,19 +108,38 @@ class Start {
 		
 		long max = 0;
 		int i1 = 0;
-		int i2 = 0;
 		int j1 = 0;
-		int j2 = 0;
-		int count = 0;
 		for(int i = 0; i < ((n*n)+n)/2; i++) {
 			for(int j = 0; j < ((n*n)+n)/2; j++) {
 //				System.out.println(count + ": " + values[i][j]);
-				count++;
 				if(values[i][j] > max) {
 					max = values[i][j];
+					i1 = i;
+					j1 = j;
 				}
 			}
 		}
-		System.out.println(max);
+		int[] a = coordinates(i1, j1, n);
+		System.out.println("i1 = " + a[0] + "\tj1 = " + a[2] + "\ti2 = " + a[1] + "\tj2 = " + a[3]);
+		System.out.println("Wert: " + max);
+	}
+
+	public static int[] coordinates(int i, int j, int n) {
+		int a[] = new int[4];
+		int count = 0;
+		for(int k = 0; k < n; k++) {
+			for(int l = k; l < n; l++) {
+				if(count == i) {
+					a[0] = k;
+					a[1] = l;
+				}
+				if(count == j) {
+					a[2] = k;
+					a[3] = l;
+				}
+				count++;
+			}
+		}
+		return a;
 	}
 }
