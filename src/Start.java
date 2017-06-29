@@ -1,3 +1,17 @@
+import static apgas.Constructs.async;
+import static apgas.Constructs.asyncAt;
+import static apgas.Constructs.at;
+import static apgas.Constructs.finish;
+import static apgas.Constructs.here;
+import static apgas.Constructs.places;
+
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import apgas.Configuration;
+import apgas.Place;
+import apgas.util.GlobalRef;
+
 class Start {
 
 	public static void main(String[] args) {
@@ -5,16 +19,22 @@ class Start {
 			System.out.println("Aufruf: Start n seed");
 			System.exit(1);
 		}
-		int n = 120;//Integer.parseInt(args[0]);
+		int n = 80;//Integer.parseInt(args[0]);
 		long seed = 123;//Long.parseLong(args[1]);
+        final int p = places().size();
+        final int t = 6; //Integer.parseInt(System.getProperty(Configuration.APGAS_THREADS));
 
+		long start = System.currentTimeMillis();
+		
 		Board board = new Board(n, seed);
 //		board.printBoard();
 
 		int colPrefix[][][] = new int[n][n][10];
 		int sum[][][] = new int[((n*n)+n)/2][n][10];
 
-		//spalten präfixsummen
+		
+		
+		//spalten praefixsummen
 		for(int j = 0; j < n; j++) {
 			for(int i = 0; i < n; i++) {
 				for(Gift gift : board.board[j][i].contains) {
@@ -28,58 +48,73 @@ class Start {
 			}
 		}
 		
-//		for(int i = 0; i < n; i++) {
-//			for(int j = 0; j < n; j++) {
-//				System.out.print("( ");
-//				for(int k = 0; k < 10; k++) {
-//					System.out.print("k" + k + ": " + colPrefix[i][j][k] + " ");
-//				}
-//				System.out.print(")\t");
-//			}
-//			System.out.println();
-//		}
+		final GlobalRef<Integer[][][]> gA = new GlobalRef<Integer[][][]>( places(), () -> {
+            Integer[][][] myA = new Integer[n/p][n][10];
+            finish( () -> {
+                    int indicesPerActivity = n / (p * t);
+                    for (int k = 0; k < t; ++k) {
+                        final int fk = k;
+                        async(() -> {
+                                for (int j = fk * indicesPerActivity; j < (fk + 1) * indicesPerActivity;  ++j) {
+                                	for(int i = 0; i < n; i++) {
+                        				for(Gift gift : board.board[j + (here().id * indicesPerActivity)][i].contains) {
+                        					myA[j][i][gift.ordinal()] += 1;
+                        				}
+                        				if(j > 0) {
+                        					for(int m = 0; m < 10; m++) {
+                        						myA[j][i][m] += myA[j-1][i][m];
+                        					}
+                        				}
+                        			}
+                                }
+                        });
+                    }
+            });
+            return myA;
+         });
+	    
+		AtomicInteger c = new AtomicInteger(0);
+		final GlobalRef<AtomicInteger> gC = new GlobalRef<AtomicInteger>(c);
+		finish(() -> {   
+            for (final Place place: places()) {
+                asyncAt(place, () -> {
+                       Integer[][][] myA = gA.get();
+                       
+                       int indicesPerActivity = n / (p * t);
+                       while(place.id != at(gC.home(), () -> gC.get().get())) {
+                       }
+                       for(int i = 0; i < n/p; i++) {
+                    	   for(int j = 0; j < n; j++) {
+                    		   for(int k = 0; k < 10; k++) {
+                    			   System.out.print("k " + k +": " + myA[j][i][k] + "  ");
+                    		   }
+                    	   }
+                       }
+                       at(gC.home(), () -> gC.get().addAndGet(1));
+                });
+            }
+        }); 
 		
-		//spaltenweise summen für zeilen
+		//spaltenweise summen fuer zeilen
 		int y = 0;
 		for(int from = 0; from < n; from++) {
 			for(int to = from; to < n; to++) {
-//				System.out.print(from + ", " + to + ": ");
 				if(from != to && from > 0) {
 					for(int i = 0; i < n; i++) {
-//						System.out.print("( ");
 						for(int k = 0; k < 10; k++) {
 							sum[y][i][k] = colPrefix[to][i][k] - colPrefix[from-1][i][k];
-//							System.out.print("L" + k + ": " + sum[y][i][k] + " ");
 						}
-//						System.out.print(")\t");
 					}
 				} else {
 					for(int i = 0; i < n; i++) {
-//						System.out.print("( ");
 						for(int k = 0; k < 10; k++) {
 							sum[y][i][k] = colPrefix[to][i][k];
-//							System.out.print("k" + k + ": " + sum[y][i][k] + " ");
 						}
-//						System.out.print(")\t");
 					}
 				}
 				y++;
-//				System.out.println();
 			}
 		}
-
-//		System.out.println("sum");
-//		for(int i = 0; i < ((n*n)+n)/2; i++) {
-//			System.out.print("from: " + i/n + " to: " + i%n + ": ");
-//			for(int j = 0; j < n; j++) {
-//				System.out.print("( ");
-//				for(int k = 0; k < 10; k++) {
-//					System.out.print("k" + k + ": " + sum[i][j][k] + " ");
-//				}
-//				System.out.print(")\t");
-//			}
-//			System.out.println();
-//		}
 
 		//berechnung sum
 		long values[][] = new long[((n*n)+n)/2][((n*n)+n)/2];
@@ -111,7 +146,6 @@ class Start {
 		int j1 = 0;
 		for(int i = 0; i < ((n*n)+n)/2; i++) {
 			for(int j = 0; j < ((n*n)+n)/2; j++) {
-//				System.out.println(count + ": " + values[i][j]);
 				if(values[i][j] > max) {
 					max = values[i][j];
 					i1 = i;
@@ -122,6 +156,9 @@ class Start {
 		int[] a = coordinates(i1, j1, n);
 		System.out.println("i1 = " + a[0] + "\tj1 = " + a[2] + "\ti2 = " + a[1] + "\tj2 = " + a[3]);
 		System.out.println("Wert: " + max);
+		
+		long end = System.currentTimeMillis();
+		System.out.println(end-start + "ms");
 	}
 
 	public static int[] coordinates(int i, int j, int n) {
