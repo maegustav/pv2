@@ -17,30 +17,22 @@ class Start {
 			System.out.println("Aufruf: Start n seed");
 			System.exit(1);
 		}
-		final int n = 80;//Integer.parseInt(args[0]);
-		long seed = 123;//Long.parseLong(args[1]);
+		final int n = Integer.parseInt(args[0]);
+		long seed = Long.parseLong(args[1]);
 		final int p = places().size();
-		final int t = 6; //Integer.parseInt(System.getProperty(Configuration.APGAS_THREADS));
-
-		/* if (n % p != 0 || n < p * t) {
-            System.out.println("n muss Vielfaches von p und groesser als pt sein!");
-            System.exit(1);
-        }*/
+		
+		// Gaussian sum formula
+		final int gaussianSum = ((n*n)+n)/2;
 
 		Place placeA[] = new Place[p];
 		for(Place place : places()) {
 			placeA[place.id] = place;
 		}
 
-		long start = System.currentTimeMillis();
-
 		final Board board = new Board(n, seed);
-		//board.printBoard();
 
 		final GlobalRef<int[][][]> globalPrefix = new GlobalRef<int[][][]>(new int[n][n][10]);
-		final GlobalRef<int[][][]> globalFromToSum = new GlobalRef<int[][][]>(new int[((n*n)+n)/2][n][10]);
-
-		final int indicesPerActivity = n / (p * t);
+		final GlobalRef<int[][][]> globalFromToSum = new GlobalRef<int[][][]>(new int[gaussianSum][n][10]);
 
 		//ColPrefix calc
 		finish( ()->{
@@ -62,7 +54,6 @@ class Start {
 								}
 								final int fj = j;
 								for(int k = 0; k < 10; k++) {
-
 									final int fk = k;
 									asyncAt(globalPrefix.home(), () -> {
 										globalPrefix.get()[fj][fi][fk] = tempPrefix[fj][fi][fk];
@@ -75,9 +66,7 @@ class Start {
 			}
 		});	
 
-		long start1 = System.currentTimeMillis();
 		//spaltenweise calc
-
 		finish(() ->{
 			int[][][] tempPrefix = at(globalPrefix.home(), () -> {
 				return globalPrefix.get();
@@ -124,30 +113,12 @@ class Start {
 				});
 			}
 		});
-		/*for(int aijhskgla = 0;aijhskgla < ((n*n)+n)/2; aijhskgla++){
-			int coords[] = coordinates(aijhskgla, aijhskgla, n);
-			System.out.print(coords[0]+ " " + coords[1] + " ");
-			for(int j = 0; j < n ; j++){
-
-				for(int i = 0; i< 10; i++){
-					final int fi = i;
-					final int faijhskgla = aijhskgla;
-					final int fj = j;
-					System.out.print(at(globalFromToSum.home(),()-> globalFromToSum.get()[faijhskgla][fj][fi]));
-				}
-				System.out.print("\t");	
-			}
-			System.out.println();
-		}*/	
-
-		long end1 = System.currentTimeMillis();
-		System.out.println(end1-start1 + "ms");
 
 		//berechnung sum
 		at(globalFromToSum.home(), () -> {
-			long sumValues[][] = new long[((n*n)+n)/2][((n*n)+n)/2];
+			long sumValues[][] = new long[gaussianSum][gaussianSum];
 			finish(() -> {
-				for(int i = 0; i < ((n*n)+n)/2; i++) {
+				for(int i = 0; i < gaussianSum; i++) {
 					final int fi = i;
 					async(() -> {
 						int y = 0;
@@ -176,13 +147,15 @@ class Start {
 			long max = 0;
 			int i1 = 0;
 			int j1 = 0;
-			for(int i = 0; i < ((n*n)+n)/2; i++) {
-				for(int j = 0; j < ((n*n)+n)/2; j++) {
+			for(int i = 0; i < gaussianSum; i++) {
+				for(int j = 0; j < gaussianSum; j++) {
 					if(sumValues[i][j] > max) {
 						synchronized(sumValues) {
-							max = sumValues[i][j];
-							i1 = i;
-							j1 = j;
+							if(sumValues[i][j] > max) {
+								max = sumValues[i][j];
+								i1 = i;
+								j1 = j;
+							}
 						}
 					}
 				}
@@ -192,10 +165,6 @@ class Start {
 			System.out.println("i1 = " + a[0] + "\tj1 = " + a[2] + "\ti2 = " + a[1] + "\tj2 = " + a[3]);
 			System.out.println("Wert: " + max);
 		});
-
-		long end = System.currentTimeMillis();
-		System.out.println(end-start + "ms");
-
 	}
 
 	public static int[] coordinates(int i, int j, int n) {
